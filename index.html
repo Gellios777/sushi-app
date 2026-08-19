@@ -1,0 +1,334 @@
+const http = require("http");
+
+const html = String.raw`
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SORA SUSHI — доставка роллов</title>
+  <style>
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #fffaf7;
+      color: #241b1a;
+    }
+
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(255,250,247,.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid #eee1dc;
+    }
+
+    .nav {
+      max-width: 1150px; margin: auto; padding: 15px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .logo { font-weight: 900; font-size: 22px; letter-spacing: 1px; }
+    .logo span { color: #e33b3b; }
+
+    .cart-btn, .add-btn, .order-btn {
+      border: 0; cursor: pointer; font-weight: 800;
+      border-radius: 12px; transition: .2s;
+    }
+
+    .cart-btn {
+      background: #241b1a; color: white; padding: 12px 16px;
+    }
+
+    .cart-btn:hover, .add-btn:hover, .order-btn:hover { transform: translateY(-2px); }
+
+    .hero {
+      min-height: 410px; padding: 75px 20px;
+      background: radial-gradient(circle at 75% 25%, #ff8179 0, #e33b3b 23%, #5a1717 65%);
+      color: white;
+    }
+
+    .hero-inner {
+      max-width: 1150px; margin: auto;
+      display: flex; justify-content: space-between; align-items: center; gap: 30px;
+    }
+
+    .hero h1 { font-size: clamp(42px, 7vw, 76px); line-height: .95; margin: 0 0 20px; }
+    .hero p { font-size: 18px; max-width: 470px; line-height: 1.5; opacity: .92; }
+    .hero-sushi { font-size: clamp(130px, 20vw, 260px); filter: drop-shadow(0 16px 14px #3b0c0c99); }
+
+    .hero a {
+      display: inline-block; margin-top: 15px; padding: 14px 20px;
+      background: white; color: #bc2929; border-radius: 12px;
+      font-weight: 900; text-decoration: none;
+    }
+
+    main { max-width: 1150px; padding: 50px 20px 100px; margin: auto; }
+    .section-head { display: flex; justify-content: space-between; align-items: end; gap: 20px; }
+    h2 { font-size: 34px; margin: 0 0 8px; }
+    .muted { color: #786c68; margin: 0; }
+
+    .filters {
+      display: flex; gap: 9px; overflow-x: auto;
+      margin: 28px 0 25px; padding-bottom: 5px;
+    }
+
+    .filter {
+      white-space: nowrap; border: 1px solid #eadad4; background: white;
+      padding: 11px 15px; border-radius: 999px; cursor: pointer; font-weight: 700;
+    }
+
+    .filter.active { background: #e33b3b; color: white; border-color: #e33b3b; }
+
+    .grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px;
+    }
+
+    .card {
+      background: white; border: 1px solid #f0e4df;
+      border-radius: 18px; overflow: hidden;
+      box-shadow: 0 5px 16px #4b1e1010;
+    }
+
+    .food-image {
+      height: 150px; display: grid; place-items: center; font-size: 80px;
+      background: linear-gradient(135deg, #fff0e9, #ffe1d7);
+    }
+
+    .card-info { padding: 15px; }
+    .card h3 { margin: 0 0 7px; font-size: 18px; }
+    .card p { height: 37px; margin: 0; color: #786c68; font-size: 13px; line-height: 1.35; }
+    .card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 15px; }
+    .price { font-weight: 900; font-size: 18px; }
+    .add-btn { background: #e33b3b; color: white; padding: 10px 13px; }
+
+    .benefits {
+      margin-top: 55px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;
+    }
+
+    .benefit { background: #241b1a; color: white; padding: 23px; border-radius: 16px; }
+    .benefit b { display: block; font-size: 18px; margin: 8px 0; }
+    .benefit span { color: #d3c5c1; font-size: 14px; }
+
+    footer { background: #241b1a; padding: 28px 20px; color: #d3c5c1; text-align: center; }
+
+    .overlay {
+      display: none; position: fixed; inset: 0; background: #0008; z-index: 20;
+    }
+
+    .overlay.show { display: block; }
+
+    .cart {
+      position: fixed; right: 0; top: 0; z-index: 21;
+      width: min(420px, 100%); height: 100vh; background: white;
+      padding: 22px; transform: translateX(100%); transition: .3s;
+      display: flex; flex-direction: column;
+    }
+
+    .cart.show { transform: translateX(0); }
+    .cart-top { display: flex; justify-content: space-between; align-items: center; }
+    .close { border: 0; background: #f4ece9; border-radius: 50%; width: 36px; height: 36px; font-size: 21px; cursor: pointer; }
+    .cart-items { flex: 1; overflow-y: auto; margin: 20px 0; }
+    .empty { text-align: center; color: #8c7d78; margin-top: 55px; }
+
+    .cart-item {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 13px 0; border-bottom: 1px solid #f0e4df;
+    }
+
+    .item-name { font-weight: 800; }
+    .item-price { color: #786c68; font-size: 14px; margin-top: 4px; }
+    .qty { display: flex; align-items: center; gap: 8px; }
+    .qty button { border: 0; background: #f5e8e4; width: 27px; height: 27px; border-radius: 8px; cursor: pointer; font-weight: 900; }
+    .total { display: flex; justify-content: space-between; font-size: 20px; font-weight: 900; padding: 17px 0; border-top: 1px solid #eadad4; }
+    .order-btn { width: 100%; padding: 15px; background: #e33b3b; color: white; font-size: 16px; }
+    .order-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    @media (max-width: 850px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 600px) {
+      .hero { padding: 55px 20px; min-height: auto; }
+      .hero-sushi { display: none; }
+      .benefits { grid-template-columns: 1fr; }
+      .food-image { height: 125px; font-size: 65px; }
+      .card-info { padding: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="nav">
+      <div class="logo">SORA <span>SUSHI</span> 🍣</div>
+      <button class="cart-btn" onclick="toggleCart()">Корзина · <span id="cartCount">0</span></button>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div>
+        <div>ДОСТАВКА СУШИ И РОЛЛОВ</div>
+        <h1>Свежие роллы<br>уже сегодня</h1>
+        <p>Готовим после заказа. Доставка по городу от 45 минут.</p>
+        <a href="#menu">Смотреть меню ↓</a>
+      </div>
+      <div class="hero-sushi">🍣</div>
+    </div>
+  </section>
+
+  <main>
+    <div class="section-head" id="menu">
+      <div>
+        <h2>Меню</h2>
+        <p class="muted">Выбирай любимые роллы и добавляй в корзину</p>
+      </div>
+    </div>
+
+    <div class="filters">
+      <button class="filter active" onclick="filterMenu('all', this)">Всё меню</button>
+      <button class="filter" onclick="filterMenu('roll', this)">Роллы</button>
+      <button class="filter" onclick="filterMenu('hot', this)">Горячие</button>
+      <button class="filter" onclick="filterMenu('set', this)">Сеты</button>
+      <button class="filter" onclick="filterMenu('drink', this)">Напитки</button>
+    </div>
+
+    <div class="grid" id="menuGrid"></div>
+
+    <section class="benefits">
+      <div class="benefit"><div>⚡</div><b>От 45 минут</b><span>Привезём горячее и свежее.</span></div>
+      <div class="benefit"><div>🍣</div><b>Готовим после заказа</b><span>Никаких роллов, которые лежали весь день.</span></div>
+      <div class="benefit"><div>🎁</div><b>Бесплатная доставка</b><span>При заказе от 8 000 ₸.</span></div>
+    </section>
+  </main>
+
+  <footer>SORA SUSHI · ежедневно 11:00–23:00 · +7 (777) 123-45-67</footer>
+
+  <div class="overlay" id="overlay" onclick="toggleCart()"></div>
+
+  <aside class="cart" id="cart">
+    <div class="cart-top">
+      <h2>Твой заказ</h2>
+      <button class="close" onclick="toggleCart()">×</button>
+    </div>
+    <div class="cart-items" id="cartItems"></div>
+    <div class="total"><span>Итого</span><span id="total">0 ₸</span></div>
+    <button class="order-btn" id="orderButton" onclick="makeOrder()" disabled>Оформить заказ</button>
+  </aside>
+
+  <script>
+    const products = [
+      { id: 1, name: "Филадельфия", desc: "Лосось, сливочный сыр, огурец · 8 шт.", price: 3400, type: "roll", emoji: "🍣" },
+      { id: 2, name: "Калифорния", desc: "Креветка, тобико, огурец · 8 шт.", price: 2900, type: "roll", emoji: "🍥" },
+      { id: 3, name: "Дракон", desc: "Угорь, сыр, огурец, соус унаги · 8 шт.", price: 3900, type: "roll", emoji: "🐉" },
+      { id: 4, name: "Бонито", desc: "Лосось терияки, сыр, стружка тунца · 8 шт.", price: 3100, type: "roll", emoji: "🐟" },
+      { id: 5, name: "Темпура с креветкой", desc: "Креветка, сыр, огурец, хрустящая панировка · 8 шт.", price: 3300, type: "hot", emoji: "🔥" },
+      { id: 6, name: "Запечённый лосось", desc: "Лосось, сыр, соус спайси · 8 шт.", price: 3600, type: "hot", emoji: "🥢" },
+      { id: 7, name: "Сет SORA", desc: "Филадельфия, Калифорния, Темпура · 24 шт.", price: 8900, type: "set", emoji: "🍱" },
+      { id: 8, name: "Сет на компанию", desc: "5 популярных роллов · 40 шт.", price: 13900, type: "set", emoji: "🎉" },
+      { id: 9, name: "Coca-Cola 1 л", desc: "Охлаждённый напиток", price: 850, type: "drink", emoji: "🥤" },
+      { id: 10, name: "Морс ягодный", desc: "Домашний морс 0.5 л", price: 790, type: "drink", emoji: "🧃" }
+    ];
+
+    let cart = [];
+    let activeFilter = "all";
+
+    function formatPrice(price) {
+      return price.toLocaleString("ru-RU") + " ₸";
+    }
+
+    function renderMenu() {
+      const list = activeFilter === "all" ? products : products.filter(function(product) {
+        return product.type === activeFilter;
+      });
+
+      document.getElementById("menuGrid").innerHTML = list.map(function(product) {
+        return '<article class="card">' +
+          '<div class="food-image">' + product.emoji + '</div>' +
+          '<div class="card-info">' +
+            '<h3>' + product.name + '</h3>' +
+            '<p>' + product.desc + '</p>' +
+            '<div class="card-bottom">' +
+              '<span class="price">' + formatPrice(product.price) + '</span>' +
+              '<button class="add-btn" onclick="addToCart(' + product.id + ')">+ В корзину</button>' +
+            '</div>' +
+          '</div>' +
+        '</article>';
+      }).join("");
+    }
+
+    function filterMenu(type, button) {
+      activeFilter = type;
+      document.querySelectorAll(".filter").forEach(function(item) { item.classList.remove("active"); });
+      button.classList.add("active");
+      renderMenu();
+    }
+
+    function addToCart(id) {
+      const item = cart.find(function(product) { return product.id === id; });
+      if (item) item.quantity += 1;
+      else {
+        const product = products.find(function(product) { return product.id === id; });
+        cart.push({ id: product.id, name: product.name, price: product.price, quantity: 1 });
+      }
+      renderCart();
+    }
+
+    function changeQuantity(id, number) {
+      const item = cart.find(function(product) { return product.id === id; });
+      item.quantity += number;
+      if (item.quantity <= 0) cart = cart.filter(function(product) { return product.id !== id; });
+      renderCart();
+    }
+
+    function renderCart() {
+      const cartItems = document.getElementById("cartItems");
+      const count = cart.reduce(function(sum, item) { return sum + item.quantity; }, 0);
+      const total = cart.reduce(function(sum, item) { return sum + item.price * item.quantity; }, 0);
+
+      document.getElementById("cartCount").textContent = count;
+      document.getElementById("total").textContent = formatPrice(total);
+      document.getElementById("orderButton").disabled = cart.length === 0;
+
+      if (!cart.length) {
+        cartItems.innerHTML = '<p class="empty">Корзина пока пустая.<br>Добавь что-нибудь вкусное 🍣</p>';
+        return;
+      }
+
+      cartItems.innerHTML = cart.map(function(item) {
+        return '<div class="cart-item">' +
+          '<div><div class="item-name">' + item.name + '</div><div class="item-price">' + formatPrice(item.price) + '</div></div>' +
+          '<div class="qty">' +
+            '<button onclick="changeQuantity(' + item.id + ', -1)">−</button>' +
+            '<b>' + item.quantity + '</b>' +
+            '<button onclick="changeQuantity(' + item.id + ', 1)">+</button>' +
+          '</div>' +
+        '</div>';
+      }).join("");
+    }
+
+    function toggleCart() {
+      document.getElementById("cart").classList.toggle("show");
+      document.getElementById("overlay").classList.toggle("show");
+    }
+
+    function makeOrder() {
+      alert("Заказ принят! В настоящем сайте здесь подключают оплату и отправку заказа в WhatsApp.");
+      cart = [];
+      renderCart();
+      toggleCart();
+    }
+
+    renderMenu();
+    renderCart();
+  </script>
+</body>
+</html>
+`;
+
+const server = http.createServer(function(request, response) {
+  response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+  response.end(html);
+});
+
+server.listen(3000, function() {
+  console.log("Сайт запущен: http://localhost:3000");
+});
